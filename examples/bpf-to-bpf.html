@@ -1,0 +1,348 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>examples: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">/home/dylan/Documents/work/coverbee/examples/bpf-to-bpf.c (56.9%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none"></span>#include &lt;stddef.h&gt;
+#include &lt;linux/bpf.h&gt;
+#include &lt;linux/in.h&gt;
+#include &lt;linux/if_ether.h&gt;
+#include &lt;linux/if_packet.h&gt;
+#include &lt;linux/ip.h&gt;
+#include &lt;linux/ipv6.h&gt;
+#include &lt;linux/tcp.h&gt;
+#include &lt;linux/udp.h&gt;
+#include "bpf_endian.h"
+#include "bpf_helpers.h"
+
+struct traffic_stats
+{
+        __u64 pkts;
+        __u64 bytes;
+};
+
+// Stats on packets keyed by protocol number
+bpf_map(ip_proto_stats, LRU_PERCPU_HASH, __u8, struct traffic_stats, 16, BPF_F_NO_COMMON_LRU);
+
+// Stats on udp packets keyed by dest port
+bpf_map(udp_stats, LRU_PERCPU_HASH, __u16, struct traffic_stats, 128, BPF_F_NO_COMMON_LRU);
+
+// Stats on tcp packets keyed by dest port
+bpf_map(tcp_stats, LRU_PERCPU_HASH, __u16, struct traffic_stats, 128, BPF_F_NO_COMMON_LRU);
+
+struct vlan_hdr
+{
+        __be16 h_vlan_TCI;
+        __be16 h_vlan_encapsulated_proto;
+};
+
+s<span class="cov4" title="2">tatic __noinline void inc_ip_proto</span>(
+        __u8 proto,
+        __u64 framesize)
+{
+        <span class="cov4" title="2">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;ip_proto_stats, &amp;proto)</span>;
+        <span class="cov4" title="2">if (stats_ptr == NULL</span>)
+        {
+                // Make a new stats object
+        <span class="cov1" title="1">        struct traffic_stats stats = </span>{
+                        .pkts = 1,
+                        .bytes = framesize,
+                };
+        <span class="cov1" title="1">        bpf_map_update_elem(&amp;ip_proto_stats, &amp;proto, &amp;stats, BPF_ANY)</span>;
+        }
+        else
+        {
+        <span class="cov1" title="1">        stats_ptr-&gt;pkts++</span>;
+        <span class="cov1" title="1">        stats_ptr-&gt;bytes += framesize</span>;
+        }
+</span>}
+
+s<span class="cov4" title="2">tatic __noinline void inc_tcp</span>(
+        struct tcphdr *tcphdr,
+        __u64 framesize)
+{
+        <span class="cov7" title="4">__le16 le_dest = bpf_ntohs(tcphdr-&gt;dest)</span>;
+        // Get existing stats
+        <span class="cov4" title="2">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;tcp_stats, &amp;le_dest)</span>;
+        <span class="cov4" title="2">if (stats_ptr == NULL</span>)
+        {
+                // Make a new stats object
+        <span class="cov1" title="1">        struct traffic_stats stats = </span>{
+                        .pkts = 1,
+                        .bytes = framesize,
+                };
+        <span class="cov1" title="1">        bpf_map_update_elem(&amp;tcp_stats, &amp;le_dest, &amp;stats, BPF_ANY)</span>;
+        }
+        else
+        {
+        <span class="cov1" title="1">        stats_ptr-&gt;pkts++</span>;
+        <span class="cov1" title="1">        stats_ptr-&gt;bytes += framesize</span>;
+        }
+</span>}
+
+s<span class="cov0" title="0">tatic __noinline void inc_udp</span>(
+        struct udphdr *udphdr,
+        __u64 framesize)
+{
+        <span class="cov0" title="0">__le16 le_dest = bpf_ntohs(udphdr-&gt;dest)</span>;
+        // Get existing stats
+        <span class="cov0" title="0">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;udp_stats, &amp;le_dest)</span>;
+        <span class="cov0" title="0">if (stats_ptr == NULL</span>)
+        {
+                // Make a new stats object
+        <span class="cov0" title="0">        struct traffic_stats stats = </span>{
+                        .pkts = 1,
+                        .bytes = framesize,
+                };
+
+        <span class="cov0" title="0">        bpf_map_update_elem(&amp;udp_stats, &amp;le_dest, &amp;stats, BPF_ANY)</span>;
+        }
+        else
+        {
+        <span class="cov0" title="0">        stats_ptr-&gt;pkts++</span>;
+        <span class="cov0" title="0">        stats_ptr-&gt;bytes += framesize</span>;
+        }
+</span>}
+
+s<span class="cov4" title="2">tatic __noinline void handle_ipv4(void *data, void *data_end, __u64 nh_off</span>)
+{
+        struct iphdr *iph = data + nh_off;
+        <span class="cov4" title="2">nh_off += sizeof(struct iphdr)</span>;
+        __u64 framesize = data_end - data;
+
+        // Drop packets which don't have enough data to fit the IPv4 header
+        <span class="cov7" title="4">if (data + nh_off &gt; data_end</span>)
+        {
+                return;
+        }
+
+        <span class="cov4" title="2">__u8 ipproto = iph-&gt;protocol</span>;
+
+        <span class="cov4" title="2">inc_ip_proto(ipproto, framesize)</span>;
+
+        <span class="cov4" title="2">if (ipproto == IPPROTO_UDP</span>)
+        {
+                struct udphdr *udphdr = data + nh_off;
+        <span class="cov0" title="0">        nh_off += sizeof(struct udphdr)</span>;
+
+                // If there is not enough data to parse a UDP header, drop the packet
+        <span class="cov0" title="0">        if (data + nh_off &gt; data_end</span>)
+                {
+                        return;
+                }
+
+        <span class="cov0" title="0">        inc_udp(udphdr, framesize)</span>;
+        }
+
+        if (ipproto == IPPROTO_TCP)
+        {
+                struct tcphdr *tcphdr = data + nh_off;
+        <span class="cov4" title="2">        nh_off += sizeof(struct tcphdr)</span>;
+
+                // If there is not enough data to parse a UDP header, drop the packet
+        <span class="cov7" title="4">        if (data + nh_off &gt; data_end</span>)
+                {
+                        return;
+                }
+
+        <span class="cov4" title="2">        inc_tcp(tcphdr, framesize)</span>;
+        }
+</span>}
+
+s<span class="cov0" title="0">tatic __noinline void handle_ipv6(void *data, void *data_end, __u64 nh_off</span>)
+{
+        struct ipv6hdr *ip6h = data + nh_off;
+        <span class="cov0" title="0">nh_off += sizeof(struct ipv6hdr)</span>;
+        __u64 framesize = data_end - data;
+
+        // Drop packets which don't have enough data to fit the IPv4 header
+        <span class="cov0" title="0">if (data + nh_off &gt; data_end</span>)
+        {
+                return;
+        }
+
+        <span class="cov0" title="0">__u8 ipproto = ip6h-&gt;nexthdr</span>;
+
+        <span class="cov0" title="0">inc_ip_proto(ipproto, framesize)</span>;
+
+        <span class="cov0" title="0">if (ipproto == IPPROTO_UDP</span>)
+        {
+                struct udphdr *udphdr = data + nh_off;
+        <span class="cov0" title="0">        nh_off += sizeof(struct udphdr)</span>;
+
+                // If there is not enough data to parse a UDP header, drop the packet
+        <span class="cov0" title="0">        if (data + nh_off &gt; data_end</span>)
+                {
+                        return;
+                }
+
+        <span class="cov0" title="0">        inc_udp(udphdr, framesize)</span>;
+        }
+
+        if (ipproto == IPPROTO_TCP)
+        {
+                struct tcphdr *tcphdr = data + nh_off;
+        <span class="cov0" title="0">        nh_off += sizeof(struct tcphdr)</span>;
+
+                // If there is not enough data to parse a TCP header, drop the packet
+        <span class="cov0" title="0">        if (data + nh_off &gt; data_end</span>)
+                {
+                        return;
+                }
+
+        <span class="cov0" title="0">        inc_tcp(tcphdr, framesize)</span>;
+        }
+</span>}
+
+SEC("xdp/proto_stats")
+i<span class="cov4" title="2">nt firewall_prog(struct xdp_md *ctx</span>)
+{
+        <span class="cov4" title="2">void *data_end = (void *)(long)ctx-&gt;data_end</span>;
+        <span class="cov4" title="2">void *data = (void *)(long)ctx-&gt;data</span>;
+
+        // Offset to the next header
+        __u64 nh_off = sizeof(struct ethhdr);
+
+        // If we don't even have enough data to a ethernet frame header, drop the message
+        <span class="cov7" title="4">if (data + nh_off &gt; data_end</span>)
+        {
+                return XDP_DROP;
+        }
+
+        struct ethhdr *eth = data;
+        <span class="cov4" title="2">__be16 h_proto = eth-&gt;h_proto</span>;
+
+        // If the ethernet packet contains a IEEE 802.1Q or 802.1AD VLAN header
+        <span class="cov4" title="2">if (h_proto == bpf_htons(ETH_P_8021Q) || h_proto == bpf_htons(ETH_P_8021AD)</span>)
+        {
+                struct vlan_hdr *vhdr = data + nh_off;
+                nh_off += sizeof(struct vlan_hdr);
+
+                // Drop packets which don't have enough data to fit the VLAN header
+        <span class="cov0" title="0">        if (data + nh_off &gt; data_end</span>)
+                {
+                        return XDP_DROP;
+                }
+
+        <span class="cov0" title="0">        h_proto = vhdr-&gt;h_vlan_encapsulated_proto</span>;
+        }
+
+        <span class="cov4" title="2">if (h_proto == bpf_htons(ETH_P_IP)</span>)
+        {
+        <span class="cov4" title="2">        handle_ipv4(data, data_end, nh_off)</span>;
+        }
+        else if (h_proto == bpf_htons(ETH_P_IPV6))
+        {
+        <span class="cov0" title="0">        handle_ipv6(data, data_end, nh_off)</span>;
+        }
+
+        return XDP_PASS;
+</span>}
+
+char _license[] SEC("license") = "GPL";</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
