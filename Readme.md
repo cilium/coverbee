@@ -1,4 +1,5 @@
 # CoverBee
+[![Go Reference](https://pkg.go.dev/badge/github.com/dylandreimerink/coverbee.svg)](https://pkg.go.dev/github.com/dylandreimerink/coverbee)
 
 Code coverage collection tool for eBPF programs. CoverBee can instrument already compiled eBPF programs by giving it
 an ELF file. This allows for coverage testing without modifying the existing toolchain.
@@ -60,7 +61,7 @@ Don't forget to clean up the programs by detaching and/or removing the pins.
 
 1. Load the ELF file using `cilium/ebpf`
 2. Perform normal setup(except for loading the programs, maps can be pre-loaded)
-3. Call `coverbee.InstrumentAndLoadCollection` instead of using `ebpf.LoadCollection`
+3. Call `coverbee.InstrumentAndLoadCollection` instead of using `ebpf.NewCollectionWithOptions`
 4. Attach the program or run tests
 5. Convert the CFG gotten in step 3 to a block-list with `coverbee.CFGToBlockList`
 6. Get the `coverbee_covermap` from the collection and apply its contents to the block-list 

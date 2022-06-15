@@ -111,209 +111,209 @@ struct vlan_hdr
         __be16 h_vlan_encapsulated_proto;
 };
 
-s<span class="cov4" title="2">tatic __noinline void inc_ip_proto</span>(
-        __u8 proto,
+s<span class="cov4" title="2">tatic __noinline void inc_ip_proto(
+</span>        __u8 proto,
         __u64 framesize)
 {
-        <span class="cov4" title="2">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;ip_proto_stats, &amp;proto)</span>;
-        <span class="cov4" title="2">if (stats_ptr == NULL</span>)
-        {
+        <span class="cov4" title="2">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;ip_proto_stats, &amp;proto);
+</span>        <span class="cov4" title="2">if (stats_ptr == NULL)
+</span>        {
                 // Make a new stats object
-        <span class="cov1" title="1">        struct traffic_stats stats = </span>{
-                        .pkts = 1,
+        <span class="cov1" title="1">        struct traffic_stats stats = {
+</span>                        .pkts = 1,
                         .bytes = framesize,
                 };
-        <span class="cov1" title="1">        bpf_map_update_elem(&amp;ip_proto_stats, &amp;proto, &amp;stats, BPF_ANY)</span>;
-        }
+        <span class="cov1" title="1">        bpf_map_update_elem(&amp;ip_proto_stats, &amp;proto, &amp;stats, BPF_ANY);
+</span>        }
         else
         {
-        <span class="cov1" title="1">        stats_ptr-&gt;pkts++</span>;
-        <span class="cov1" title="1">        stats_ptr-&gt;bytes += framesize</span>;
-        }
-</span>}
-
-s<span class="cov4" title="2">tatic __noinline void inc_tcp</span>(
-        struct tcphdr *tcphdr,
+        <span class="cov1" title="1">        stats_ptr-&gt;pkts++;
+</span>        <span class="cov1" title="1">        stats_ptr-&gt;bytes += framesize;
+</span>        }
+}<span class="cov4" title="2">
+</span>
+s<span class="cov4" title="2">tatic __noinline void inc_tcp(
+</span>        struct tcphdr *tcphdr,
         __u64 framesize)
 {
-        <span class="cov7" title="4">__le16 le_dest = bpf_ntohs(tcphdr-&gt;dest)</span>;
-        // Get existing stats
-        <span class="cov4" title="2">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;tcp_stats, &amp;le_dest)</span>;
-        <span class="cov4" title="2">if (stats_ptr == NULL</span>)
-        {
+        <span class="cov7" title="4">__le16 le_dest = bpf_ntohs(tcphdr-&gt;dest);
+</span>        // Get existing stats
+        <span class="cov4" title="2">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;tcp_stats, &amp;le_dest);
+</span>        <span class="cov4" title="2">if (stats_ptr == NULL)
+</span>        {
                 // Make a new stats object
-        <span class="cov1" title="1">        struct traffic_stats stats = </span>{
-                        .pkts = 1,
+        <span class="cov1" title="1">        struct traffic_stats stats = {
+</span>                        .pkts = 1,
                         .bytes = framesize,
                 };
-        <span class="cov1" title="1">        bpf_map_update_elem(&amp;tcp_stats, &amp;le_dest, &amp;stats, BPF_ANY)</span>;
-        }
+        <span class="cov1" title="1">        bpf_map_update_elem(&amp;tcp_stats, &amp;le_dest, &amp;stats, BPF_ANY);
+</span>        }
         else
         {
-        <span class="cov1" title="1">        stats_ptr-&gt;pkts++</span>;
-        <span class="cov1" title="1">        stats_ptr-&gt;bytes += framesize</span>;
-        }
-</span>}
-
-s<span class="cov0" title="0">tatic __noinline void inc_udp</span>(
-        struct udphdr *udphdr,
+        <span class="cov1" title="1">        stats_ptr-&gt;pkts++;
+</span>        <span class="cov1" title="1">        stats_ptr-&gt;bytes += framesize;
+</span>        }
+}<span class="cov4" title="2">
+</span>
+s<span class="cov0" title="0">tatic __noinline void inc_udp(
+</span>        struct udphdr *udphdr,
         __u64 framesize)
 {
-        <span class="cov0" title="0">__le16 le_dest = bpf_ntohs(udphdr-&gt;dest)</span>;
-        // Get existing stats
-        <span class="cov0" title="0">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;udp_stats, &amp;le_dest)</span>;
-        <span class="cov0" title="0">if (stats_ptr == NULL</span>)
-        {
+        <span class="cov0" title="0">__le16 le_dest = bpf_ntohs(udphdr-&gt;dest);
+</span>        // Get existing stats
+        <span class="cov0" title="0">struct traffic_stats *stats_ptr = bpf_map_lookup_elem(&amp;udp_stats, &amp;le_dest);
+</span>        <span class="cov0" title="0">if (stats_ptr == NULL)
+</span>        {
                 // Make a new stats object
-        <span class="cov0" title="0">        struct traffic_stats stats = </span>{
-                        .pkts = 1,
+        <span class="cov0" title="0">        struct traffic_stats stats = {
+</span>                        .pkts = 1,
                         .bytes = framesize,
                 };
 
-        <span class="cov0" title="0">        bpf_map_update_elem(&amp;udp_stats, &amp;le_dest, &amp;stats, BPF_ANY)</span>;
-        }
+        <span class="cov0" title="0">        bpf_map_update_elem(&amp;udp_stats, &amp;le_dest, &amp;stats, BPF_ANY);
+</span>        }
         else
         {
-        <span class="cov0" title="0">        stats_ptr-&gt;pkts++</span>;
-        <span class="cov0" title="0">        stats_ptr-&gt;bytes += framesize</span>;
-        }
-</span>}
-
-s<span class="cov4" title="2">tatic __noinline void handle_ipv4(void *data, void *data_end, __u64 nh_off</span>)
-{
+        <span class="cov0" title="0">        stats_ptr-&gt;pkts++;
+</span>        <span class="cov0" title="0">        stats_ptr-&gt;bytes += framesize;
+</span>        }
+}<span class="cov0" title="0">
+</span>
+s<span class="cov4" title="2">tatic __noinline void handle_ipv4(void *data, void *data_end, __u64 nh_off)
+</span>{
         struct iphdr *iph = data + nh_off;
-        <span class="cov4" title="2">nh_off += sizeof(struct iphdr)</span>;
-        __u64 framesize = data_end - data;
+        <span class="cov4" title="2">nh_off += sizeof(struct iphdr);
+</span>        __u64 framesize = data_end - data;
 
         // Drop packets which don't have enough data to fit the IPv4 header
-        <span class="cov7" title="4">if (data + nh_off &gt; data_end</span>)
-        {
+        <span class="cov7" title="4">if (data + nh_off &gt; data_end)
+</span>        {
                 return;
         }
 
-        <span class="cov4" title="2">__u8 ipproto = iph-&gt;protocol</span>;
-
-        <span class="cov4" title="2">inc_ip_proto(ipproto, framesize)</span>;
-
-        <span class="cov4" title="2">if (ipproto == IPPROTO_UDP</span>)
-        {
+        <span class="cov4" title="2">__u8 ipproto = iph-&gt;protocol;
+</span>
+        <span class="cov4" title="2">inc_ip_proto(ipproto, framesize);
+</span>
+        <span class="cov4" title="2">if (ipproto == IPPROTO_UDP)
+</span>        {
                 struct udphdr *udphdr = data + nh_off;
-        <span class="cov0" title="0">        nh_off += sizeof(struct udphdr)</span>;
-
+        <span class="cov0" title="0">        nh_off += sizeof(struct udphdr);
+</span>
                 // If there is not enough data to parse a UDP header, drop the packet
-        <span class="cov0" title="0">        if (data + nh_off &gt; data_end</span>)
-                {
+        <span class="cov0" title="0">        if (data + nh_off &gt; data_end)
+</span>                {
                         return;
                 }
 
-        <span class="cov0" title="0">        inc_udp(udphdr, framesize)</span>;
-        }
+        <span class="cov0" title="0">        inc_udp(udphdr, framesize);
+</span>        }
 
         if (ipproto == IPPROTO_TCP)
         {
                 struct tcphdr *tcphdr = data + nh_off;
-        <span class="cov4" title="2">        nh_off += sizeof(struct tcphdr)</span>;
-
+        <span class="cov4" title="2">        nh_off += sizeof(struct tcphdr);
+</span>
                 // If there is not enough data to parse a UDP header, drop the packet
-        <span class="cov7" title="4">        if (data + nh_off &gt; data_end</span>)
-                {
+        <span class="cov7" title="4">        if (data + nh_off &gt; data_end)
+</span>                {
                         return;
                 }
 
-        <span class="cov4" title="2">        inc_tcp(tcphdr, framesize)</span>;
-        }
-</span>}
-
-s<span class="cov0" title="0">tatic __noinline void handle_ipv6(void *data, void *data_end, __u64 nh_off</span>)
-{
+        <span class="cov4" title="2">        inc_tcp(tcphdr, framesize);
+</span>        }
+}<span class="cov4" title="2">
+</span>
+s<span class="cov0" title="0">tatic __noinline void handle_ipv6(void *data, void *data_end, __u64 nh_off)
+</span>{
         struct ipv6hdr *ip6h = data + nh_off;
-        <span class="cov0" title="0">nh_off += sizeof(struct ipv6hdr)</span>;
-        __u64 framesize = data_end - data;
+        <span class="cov0" title="0">nh_off += sizeof(struct ipv6hdr);
+</span>        __u64 framesize = data_end - data;
 
         // Drop packets which don't have enough data to fit the IPv4 header
-        <span class="cov0" title="0">if (data + nh_off &gt; data_end</span>)
-        {
+        <span class="cov0" title="0">if (data + nh_off &gt; data_end)
+</span>        {
                 return;
         }
 
-        <span class="cov0" title="0">__u8 ipproto = ip6h-&gt;nexthdr</span>;
-
-        <span class="cov0" title="0">inc_ip_proto(ipproto, framesize)</span>;
-
-        <span class="cov0" title="0">if (ipproto == IPPROTO_UDP</span>)
-        {
+        <span class="cov0" title="0">__u8 ipproto = ip6h-&gt;nexthdr;
+</span>
+        <span class="cov0" title="0">inc_ip_proto(ipproto, framesize);
+</span>
+        <span class="cov0" title="0">if (ipproto == IPPROTO_UDP)
+</span>        {
                 struct udphdr *udphdr = data + nh_off;
-        <span class="cov0" title="0">        nh_off += sizeof(struct udphdr)</span>;
-
+        <span class="cov0" title="0">        nh_off += sizeof(struct udphdr);
+</span>
                 // If there is not enough data to parse a UDP header, drop the packet
-        <span class="cov0" title="0">        if (data + nh_off &gt; data_end</span>)
-                {
+        <span class="cov0" title="0">        if (data + nh_off &gt; data_end)
+</span>                {
                         return;
                 }
 
-        <span class="cov0" title="0">        inc_udp(udphdr, framesize)</span>;
-        }
+        <span class="cov0" title="0">        inc_udp(udphdr, framesize);
+</span>        }
 
         if (ipproto == IPPROTO_TCP)
         {
                 struct tcphdr *tcphdr = data + nh_off;
-        <span class="cov0" title="0">        nh_off += sizeof(struct tcphdr)</span>;
-
+        <span class="cov0" title="0">        nh_off += sizeof(struct tcphdr);
+</span>
                 // If there is not enough data to parse a TCP header, drop the packet
-        <span class="cov0" title="0">        if (data + nh_off &gt; data_end</span>)
-                {
+        <span class="cov0" title="0">        if (data + nh_off &gt; data_end)
+</span>                {
                         return;
                 }
 
-        <span class="cov0" title="0">        inc_tcp(tcphdr, framesize)</span>;
-        }
-</span>}
-
+        <span class="cov0" title="0">        inc_tcp(tcphdr, framesize);
+</span>        }
+}<span class="cov0" title="0">
+</span>
 SEC("xdp/proto_stats")
-i<span class="cov4" title="2">nt firewall_prog(struct xdp_md *ctx</span>)
-{
-        <span class="cov4" title="2">void *data_end = (void *)(long)ctx-&gt;data_end</span>;
-        <span class="cov4" title="2">void *data = (void *)(long)ctx-&gt;data</span>;
-
+i<span class="cov4" title="2">nt firewall_prog(struct xdp_md *ctx)
+</span>{
+        <span class="cov4" title="2">void *data_end = (void *)(long)ctx-&gt;data_end;
+</span>        <span class="cov4" title="2">void *data = (void *)(long)ctx-&gt;data;
+</span>
         // Offset to the next header
         __u64 nh_off = sizeof(struct ethhdr);
 
         // If we don't even have enough data to a ethernet frame header, drop the message
-        <span class="cov7" title="4">if (data + nh_off &gt; data_end</span>)
-        {
+        <span class="cov7" title="4">if (data + nh_off &gt; data_end)
+</span>        {
                 return XDP_DROP;
         }
 
         struct ethhdr *eth = data;
-        <span class="cov4" title="2">__be16 h_proto = eth-&gt;h_proto</span>;
-
+        <span class="cov4" title="2">__be16 h_proto = eth-&gt;h_proto;
+</span>
         // If the ethernet packet contains a IEEE 802.1Q or 802.1AD VLAN header
-        <span class="cov4" title="2">if (h_proto == bpf_htons(ETH_P_8021Q) || h_proto == bpf_htons(ETH_P_8021AD)</span>)
-        {
+        <span class="cov4" title="2">if (h_proto == bpf_htons(ETH_P_8021Q) || h_proto == bpf_htons(ETH_P_8021AD))
+</span>        {
                 struct vlan_hdr *vhdr = data + nh_off;
                 nh_off += sizeof(struct vlan_hdr);
 
                 // Drop packets which don't have enough data to fit the VLAN header
-        <span class="cov0" title="0">        if (data + nh_off &gt; data_end</span>)
-                {
+        <span class="cov0" title="0">        if (data + nh_off &gt; data_end)
+</span>                {
                         return XDP_DROP;
                 }
 
-        <span class="cov0" title="0">        h_proto = vhdr-&gt;h_vlan_encapsulated_proto</span>;
-        }
+        <span class="cov0" title="0">        h_proto = vhdr-&gt;h_vlan_encapsulated_proto;
+</span>        }
 
-        <span class="cov4" title="2">if (h_proto == bpf_htons(ETH_P_IP)</span>)
-        {
-        <span class="cov4" title="2">        handle_ipv4(data, data_end, nh_off)</span>;
-        }
+        <span class="cov4" title="2">if (h_proto == bpf_htons(ETH_P_IP))
+</span>        {
+        <span class="cov4" title="2">        handle_ipv4(data, data_end, nh_off);
+</span>        }
         else if (h_proto == bpf_htons(ETH_P_IPV6))
         {
-        <span class="cov0" title="0">        handle_ipv6(data, data_end, nh_off)</span>;
-        }
+        <span class="cov0" title="0">        handle_ipv6(data, data_end, nh_off);
+</span>        }
 
         return XDP_PASS;
-</span>}
-
+}<span class="cov4" title="2">
+</span>
 char _license[] SEC("license") = "GPL";</pre>
 		
 		</div>

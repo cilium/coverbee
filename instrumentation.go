@@ -512,7 +512,7 @@ func CFGToBlockList(cfg []*ProgBlock) [][]CoverBlock {
 					StartLine: int(line.LineNumber()),
 					StartCol:  2,
 					EndLine:   int(line.LineNumber()),
-					EndCol:    len(line.Line()),
+					EndCol:    2000,
 					NumStmt:   1,
 				},
 			})
