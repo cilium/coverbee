@@ -367,9 +367,11 @@ func InstrumentAndLoadCollection(
 
 	if logWriter != nil {
 		fmt.Fprintln(logWriter, "=== Instrumented verifier logs ===")
-		for name, prog := range loadedColl.Programs {
-			fmt.Fprintln(logWriter, "---", name, "---")
-			fmt.Fprintln(logWriter, prog.VerifierLog)
+		if loadedColl != nil {
+			for name, prog := range loadedColl.Programs {
+				fmt.Fprintln(logWriter, "---", name, "---")
+				fmt.Fprintln(logWriter, prog.VerifierLog)
+			}
 		}
 	}
 
