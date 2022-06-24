@@ -77,12 +77,12 @@ func loadCmd() *cobra.Command {
 	fs.StringVar(&flagMapPinDir, "map-pin-dir", "", "Path to the directory containing map pins")
 	panicOnError(load.MarkFlagDirname("map-pin-dir"))
 
-	fs.StringVar(&flagCoverMapPinPath, "covermap-pin", "", "Path to pin for the covermap (created by coverbee containing "+
-		"coverage information)")
+	fs.StringVar(&flagCoverMapPinPath, "covermap-pin", "", "Path to pin for the covermap (created by coverbee "+
+		"containing coverage information)")
 	panicOnError(load.MarkFlagFilename("covermap-pin"))
 
-	fs.StringVar(&flagBlockListPath, "block-list", "", "Path where the block-list is stored (contains coverage data to "+
-		"source code mapping, needed when reading from cover map)")
+	fs.StringVar(&flagBlockListPath, "block-list", "", "Path where the block-list is stored (contains coverage data "+
+		"to source code mapping, needed when reading from cover map)")
 	panicOnError(load.MarkFlagFilename("block-list", "json"))
 	panicOnError(load.MarkFlagRequired("block-list"))
 
@@ -163,6 +163,7 @@ func load(cmd *cobra.Command, args []string) error {
 
 	for _, m := range spec.Maps {
 		if m.Extra != nil {
+			//nolint:errcheck // we explicitly discard the error, no remediation available
 			_, _ = io.ReadAll(m.Extra)
 		}
 	}
@@ -184,7 +185,8 @@ func load(cmd *cobra.Command, args []string) error {
 
 	var logWriter io.Writer
 	if flagLogPath != "" {
-		logFile, err := os.Create(flagLogPath)
+		var logFile *os.File
+		logFile, err = os.Create(flagLogPath)
 		if err != nil {
 			return fmt.Errorf("open log file: %w", err)
 		}
@@ -254,12 +256,12 @@ func coverageCmd() *cobra.Command {
 	fs.StringVar(&flagMapPinDir, "map-pin-dir", "", "Path to the directory containing map pins")
 	panicOnError(coverCmd.MarkFlagDirname("map-pin-dir"))
 
-	fs.StringVar(&flagCoverMapPinPath, "covermap-pin", "", "Path to pin for the covermap (created by coverbee containing "+
-		"coverage information)")
+	fs.StringVar(&flagCoverMapPinPath, "covermap-pin", "", "Path to pin for the covermap (created by coverbee "+
+		"containing coverage information)")
 	panicOnError(coverCmd.MarkFlagFilename("covermap-pin"))
 
-	fs.StringVar(&flagBlockListPath, "block-list", "", "Path where the block-list is stored (contains coverage data to "+
-		"source code mapping, needed when reading from cover map)")
+	fs.StringVar(&flagBlockListPath, "block-list", "", "Path where the block-list is stored (contains coverage data "+
+		"to source code mapping, needed when reading from cover map)")
 	panicOnError(coverCmd.MarkFlagFilename("block-list", "json"))
 	panicOnError(coverCmd.MarkFlagRequired("block-list"))
 
@@ -311,7 +313,8 @@ func coverage(cmd *cobra.Command, args []string) error {
 	if flagOutputPath == "-" {
 		output = os.Stdout
 	} else {
-		f, err := os.Create(flagOutputPath)
+		var f *os.File
+		f, err = os.Create(flagOutputPath)
 		if err != nil {
 			return fmt.Errorf("error creating output file: %w", err)
 		}

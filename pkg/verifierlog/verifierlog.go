@@ -259,8 +259,15 @@ func parseRecapState(line string) VerifierStatement {
 		return &Error{Msg: "recap state: no match"}
 	}
 
-	instNr, _ := strconv.Atoi(match[1])
-	verifierState := parseVerifierState(match[2])
+	instNr, err := strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("recap state: inst nr atoi: %s", err)}
+	}
+
+	verifierState, err := parseVerifierState(match[2])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("recap state: parse verifier state: %s", err)}
+	}
 	if verifierState == nil {
 		return &Error{Msg: "recap state: nil verifier state"}
 	}
@@ -293,13 +300,20 @@ func parseInstructionState(line string) VerifierStatement {
 		return &Error{Msg: "instruction state: no match"}
 	}
 
-	instNr, _ := strconv.Atoi(match[1])
+	instNr, err := strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("inst nr atoi: %s", err)}
+	}
+
 	opcode, err := hex.DecodeString(match[2])
 	if err != nil {
 		return &Error{Msg: fmt.Sprintf("decode opcode hex: %s", err)}
 	}
 
-	verifierState := parseVerifierState(match[4])
+	verifierState, err := parseVerifierState(match[4])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("parse verifier state: %s", err)}
+	}
 	if verifierState == nil {
 		return &Error{Msg: "bad or missing verifier state"}
 	}
@@ -336,7 +350,11 @@ func parseInstruction(line string) VerifierStatement {
 		return &Error{Msg: "instruction state: no match"}
 	}
 
-	instNr, _ := strconv.Atoi(match[1])
+	instNr, err := strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("inst nr atoi: %s", err)}
+	}
+
 	opcode, err := hex.DecodeString(match[2])
 	if err != nil {
 		return &Error{Msg: fmt.Sprintf("decode opcode hex: %s", err)}
@@ -362,7 +380,7 @@ type Instruction struct {
 	Assembly          string
 }
 
-func parseVerifierState(line string) *VerifierState {
+func parseVerifierState(line string) (*VerifierState, error) {
 	var state VerifierState
 	line = strings.TrimSpace(line)
 
@@ -370,9 +388,15 @@ func parseVerifierState(line string) *VerifierState {
 		line = strings.TrimPrefix(line, "frame")
 		colon := strings.Index(line, ":")
 		if colon == -1 {
-			return nil
+			return nil, nil
 		}
-		state.FrameNumber, _ = strconv.Atoi(line[:colon])
+
+		var err error
+		state.FrameNumber, err = strconv.Atoi(line[:colon])
+		if err != nil {
+			return nil, fmt.Errorf("frame number atoi: %s", err)
+		}
+
 		line = strings.TrimSpace(line[colon+1:])
 	}
 
@@ -418,19 +442,26 @@ func parseVerifierState(line string) *VerifierState {
 		}
 
 		if strings.HasPrefix(key, "fp") {
-			stackState := parseStackState(key, value)
+			stackState, err := parseStackState(key, value)
+			if err != nil {
+				return nil, fmt.Errorf("parse stack state: %w", err)
+			}
+
 			if stackState != nil {
 				state.Stack = append(state.Stack, *stackState)
 			}
 		} else {
-			regState := parseRegisterState(key, value)
+			regState, err := parseRegisterState(key, value)
+			if err != nil {
+				return nil, fmt.Errorf("parse register state: %w", err)
+			}
 			if regState != nil {
 				state.Registers = append(state.Registers, *regState)
 			}
 		}
 	}
 
-	return &state
+	return &state, nil
 }
 
 // VerifierState contains a description of the state of the verifier at a certain point. Used by a number of statements.
@@ -441,7 +472,7 @@ type VerifierState struct {
 	Stack       []StackState
 }
 
-func parseRegisterState(key, value string) *RegisterState {
+func parseRegisterState(key, value string) (*RegisterState, error) {
 	var state RegisterState
 
 	if strings.HasSuffix(key, "_r") {
@@ -460,14 +491,21 @@ func parseRegisterState(key, value string) *RegisterState {
 	}
 
 	key = strings.Trim(key, "R")
-	keyNum, _ := strconv.Atoi(key)
+	keyNum, err := strconv.Atoi(key)
+	if err != nil {
+		return nil, fmt.Errorf("reg num atoi: %w", err)
+	}
 	state.Register = asm.Register(keyNum)
 
-	if val := parseRegisterValue(value); val != nil {
+	val, err := parseRegisterValue(value)
+	if err != nil {
+		return nil, fmt.Errorf("parse register value: %w", err)
+	}
+	if val != nil {
 		state.Value = *val
 	}
 
-	return &state
+	return &state, err
 }
 
 func (is *VerifierState) String() string {
@@ -696,7 +734,7 @@ func parseRegisterType(line string) (RegType, bool, string) {
 	return typ, precise, line
 }
 
-func parseRegisterValue(line string) *RegisterValue {
+func parseRegisterValue(line string) (*RegisterValue, error) {
 	var val RegisterValue
 
 	line = strings.TrimSpace(line)
@@ -707,7 +745,7 @@ func parseRegisterValue(line string) *RegisterValue {
 		varOff, err := strconv.Atoi(line)
 		if err == nil {
 			val.VarOff.Value = int64(varOff)
-			return &val
+			return &val, nil
 		}
 	}
 
@@ -721,7 +759,9 @@ func parseRegisterValue(line string) *RegisterValue {
 		key := pair[:eq]
 		valStr := pair[eq+1:]
 
+		//nolint:errcheck // one of these will always fail, doesn't matter since the default value is 0
 		intVal, _ := strconv.ParseInt(valStr, 10, 64)
+		//nolint:errcheck // one of these will always fail, doesn't matter since the default value is 0
 		uintVal, _ := strconv.ParseUint(valStr, 10, 64)
 
 		switch key {
@@ -758,26 +798,32 @@ func parseRegisterValue(line string) *RegisterValue {
 		case "var_off":
 			semicolon := strings.Index(valStr, ";")
 			closeBrace := strings.Index(valStr, ")")
-			// Semicolon must exist and not be at the first char.
+
 			if semicolon < 1 {
-				// Break to avoid bad slice access
-				break
+				return nil, fmt.Errorf("bad var_off, semicolon missing or misplaced")
 			}
 
-			// close brace must come after the semicolon
 			if closeBrace < semicolon {
-				// Break to avoid bad slice access
-				break
+				return nil, fmt.Errorf("bad var_off, closing brace must come after semicolon")
 			}
 
 			hexVal := valStr[1:semicolon]
 			hexMask := valStr[semicolon+1 : closeBrace]
-			val.VarOff.Value, _ = strconv.ParseInt(hexVal, 16, 64)
-			val.VarOff.Value, _ = strconv.ParseInt(hexMask, 16, 64)
+
+			var err error
+			val.VarOff.Value, err = strconv.ParseInt(hexVal, 16, 64)
+			if err != nil {
+				return nil, fmt.Errorf("parse hex val: %w", err)
+			}
+
+			val.VarOff.Value, err = strconv.ParseInt(hexMask, 16, 64)
+			if err != nil {
+				return nil, fmt.Errorf("parse hex mask: %w", err)
+			}
 		}
 	}
 
-	return &val
+	return &val, nil
 }
 
 // RegisterValue is the value part of the register state, the part after the =
@@ -933,7 +979,7 @@ func (r RegisterState) String() string {
 	return sb.String()
 }
 
-func parseStackState(key, value string) *StackState {
+func parseStackState(key, value string) (*StackState, error) {
 	var state StackState
 
 	if strings.HasSuffix(key, "_r") {
@@ -952,7 +998,11 @@ func parseStackState(key, value string) *StackState {
 	}
 
 	key = strings.Trim(key, "fp-")
-	keyNum, _ := strconv.Atoi(key)
+	keyNum, err := strconv.Atoi(key)
+	if err != nil {
+		return nil, fmt.Errorf("fp offset atoi: %s", err)
+	}
+
 	state.Offset = keyNum
 
 	state.SpilledRegister.Type, state.SpilledRegister.Precise, value = parseRegisterType(value)
@@ -971,7 +1021,7 @@ func parseStackState(key, value string) *StackState {
 	// TODO refs
 	// TODO callback
 
-	return &state
+	return &state, nil
 }
 
 // StackSlot describes the contents of a single byte within a stack slot
@@ -1026,16 +1076,24 @@ func (ss *StackState) String() string {
 
 var subProgLocRegex = regexp.MustCompile(`^func#(\d+) @(\d+)`)
 
-func parseSubProgLocation(line string) *SubProgLocation {
+func parseSubProgLocation(line string) VerifierStatement {
 	match := subProgLocRegex.FindStringSubmatch(line)
 	if len(match) != 3 {
 		return nil
 	}
 
-	progId, _ := strconv.Atoi(match[1])
-	instNum, _ := strconv.Atoi(match[2])
+	progID, err := strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("sub prog loc: atoi prog ID: %s", err)}
+	}
+
+	instNum, err := strconv.Atoi(match[2])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("sub prog loc: atoi inst num: %s", err)}
+	}
+
 	return &SubProgLocation{
-		ProgID:           progId,
+		ProgID:           progID,
 		StartInstruction: instNum,
 	}
 }
@@ -1053,17 +1111,24 @@ func (spl *SubProgLocation) String() string {
 
 func (spl *SubProgLocation) verifierStmt() {}
 
-func parsePropagatePrecision(line string) *PropagatePrecision {
+func parsePropagatePrecision(line string) VerifierStatement {
 	line = strings.TrimPrefix(line, "propagating ")
 	if strings.HasPrefix(line, "r") {
-		regInt, _ := strconv.Atoi(strings.TrimPrefix(line, "r"))
+		regInt, err := strconv.Atoi(strings.TrimPrefix(line, "r"))
+		if err != nil {
+			return &Error{Msg: fmt.Sprintf("register number atoi: %s", err)}
+		}
+
 		reg := asm.Register(regInt)
 		return &PropagatePrecision{
 			Register: &reg,
 		}
 	}
 
-	offset, _ := strconv.Atoi(strings.TrimPrefix(line, "fp-"))
+	offset, err := strconv.Atoi(strings.TrimPrefix(line, "fp-"))
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("offset atoi: %s", err)}
+	}
 	return &PropagatePrecision{
 		Offset: offset,
 	}
@@ -1088,15 +1153,24 @@ func (pp *PropagatePrecision) verifierStmt() {}
 
 var statePrunedRegex = regexp.MustCompile(`^(?:from )?(\d+)(?: to (\d+))?: safe`)
 
-func parseStatePruned(line string) *StatePruned {
+func parseStatePruned(line string) VerifierStatement {
 	match := statePrunedRegex.FindStringSubmatch(line)
 	var (
 		from int
 		to   int
+		err  error
 	)
-	from, _ = strconv.Atoi(match[1])
+	from, err = strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("from atoi: %s", err)}
+	}
+
 	if match[2] != "" {
-		to, _ = strconv.Atoi(match[2])
+		to, err = strconv.Atoi(match[2])
+		if err != nil {
+			return &Error{Msg: fmt.Sprintf("to atoi: %s", err)}
+		}
+
 		return &StatePruned{
 			From: from,
 			To:   to,
@@ -1128,20 +1202,33 @@ func (sp *StatePruned) verifierStmt() {}
 
 var branchEvaluationRegex = regexp.MustCompile(`^from (\d+) to (\d+): (.*)`)
 
-func parseBranchEvaluation(line string) *BranchEvaluation {
+func parseBranchEvaluation(line string) VerifierStatement {
 	match := branchEvaluationRegex.FindStringSubmatch(line)
-	from, _ := strconv.Atoi(match[1])
-	to, _ := strconv.Atoi(match[2])
+	from, err := strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("from atoi: %s", err)}
+	}
+
+	to, err := strconv.Atoi(match[2])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("to atoi: %s", err)}
+	}
+
+	verifierState, err := parseVerifierState(match[3])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("branch eval: parse verifier state: %s", err)}
+	}
 
 	return &BranchEvaluation{
 		From:  from,
 		To:    to,
-		State: parseVerifierState(match[3]),
+		State: verifierState,
 	}
 }
 
 // BranchEvaluation means that the verifier switch state and is now evaluating another permutation.
-// Example: "from 84 to 40: frame1: R0=invP(id=0) R6=pkt(id=0,off=38,r=38,imm=0) R7=pkt(id=0,off=0,r=38,imm=0) R8=invP18 R9=invP(id=2,umax_value=255,var_off=(0x0; 0xff)) R10=fp0 fp-8=pkt_end fp-16=mmmmmmmm"
+// Example: "from 84 to 40: frame1: R0=invP(id=0) R6=pkt(id=0,off=38,r=38,imm=0) R7=pkt(id=0,off=0,r=38,imm=0)
+// R8=invP18 R9=invP(id=2,umax_value=255,var_off=(0x0; 0xff)) R10=fp0 fp-8=pkt_end fp-16=mmmmmmmm"
 type BranchEvaluation struct {
 	From  int
 	To    int
@@ -1156,10 +1243,17 @@ func (be *BranchEvaluation) verifierStmt() {}
 
 var backTrackingHeaderRegex = regexp.MustCompile(`^last_idx (\d+) first_idx (\d+)`)
 
-func parseBackTrackingHeader(line string) *BackTrackingHeader {
+func parseBackTrackingHeader(line string) VerifierStatement {
 	match := backTrackingHeaderRegex.FindStringSubmatch(line)
-	last, _ := strconv.Atoi(match[1])
-	first, _ := strconv.Atoi(match[2])
+	last, err := strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("last atoi: %s", err)}
+	}
+
+	first, err := strconv.Atoi(match[2])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("first atoi: %s", err)}
+	}
 
 	return &BackTrackingHeader{
 		Last:  last,
@@ -1182,10 +1276,19 @@ func (bt *BackTrackingHeader) verifierStmt() {}
 
 var backTrackInstructionRegex = regexp.MustCompile(`^regs=([0-9a-fA-F]+) stack=(\d+) before (.*)`)
 
-func parseBackTrackInstruction(line string) *BackTrackInstruction {
+func parseBackTrackInstruction(line string) VerifierStatement {
 	match := backTrackInstructionRegex.FindStringSubmatch(line)
-	regs, _ := hex.DecodeString(match[1])
-	stack, _ := strconv.ParseInt(match[2], 10, 64)
+	regs, err := hex.DecodeString(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprint("hex decode regs: ", err)}
+	}
+
+	var stack int64
+	stack, err = strconv.ParseInt(match[2], 10, 64)
+	if err != nil {
+		return &Error{Msg: fmt.Sprint("parse int stack: ", err)}
+	}
+
 	instruction := parseInstruction(match[3])
 
 	return &BackTrackInstruction{
@@ -1209,13 +1312,27 @@ func (bt *BackTrackInstruction) String() string {
 
 func (bt *BackTrackInstruction) verifierStmt() {}
 
-var backTrackingTrailerRegex = regexp.MustCompile(`parent (didn't have|already had) regs=([0-9a-fA-F]+) stack=(\d+) marks:? ?(.*)?`)
+var backTrackingTrailerRegex = regexp.MustCompile(
+	`parent (didn't have|already had) regs=([0-9a-fA-F]+) stack=(\d+) marks:? ?(.*)?`,
+)
 
-func parseBacktrackingTrailer(line string) *BackTrackingTrailer {
+func parseBacktrackingTrailer(line string) VerifierStatement {
 	match := backTrackingTrailerRegex.FindStringSubmatch(line)
-	regs, _ := hex.DecodeString(match[2])
-	stack, _ := strconv.ParseInt(match[3], 10, 64)
-	state := parseVerifierState(match[4])
+	regs, err := hex.DecodeString(match[2])
+	if err != nil {
+		return &Error{Msg: fmt.Sprint("hex decode regs: ", err)}
+	}
+
+	var stack int64
+	stack, err = strconv.ParseInt(match[3], 10, 64)
+	if err != nil {
+		return &Error{Msg: fmt.Sprint("parse int stack: ", err)}
+	}
+
+	state, err := parseVerifierState(match[4])
+	if err != nil {
+		return &Error{Msg: fmt.Sprint("parse verifier state: ", err)}
+	}
 
 	return &BackTrackingTrailer{
 		ParentMatch:   match[1] == "already had",
@@ -1236,7 +1353,8 @@ type BackTrackingTrailer struct {
 
 func (bt *BackTrackingTrailer) String() string {
 	if bt.ParentMatch {
-		return fmt.Sprintf("parent already had regs=%x stack=%d marks: %s", bt.Regs, bt.Stack, bt.VerifierState.String())
+		return fmt.Sprintf(
+			"parent already had regs=%x stack=%d marks: %s", bt.Regs, bt.Stack, bt.VerifierState.String())
 	}
 
 	return fmt.Sprintf("parent didn't have regs=%x stack=%d marks: %s", bt.Regs, bt.Stack, bt.VerifierState.String())
@@ -1244,16 +1362,42 @@ func (bt *BackTrackingTrailer) String() string {
 
 func (bt *BackTrackingTrailer) verifierStmt() {}
 
-var loadSuccessRegex = regexp.MustCompile(`processed (\d+) insns \(limit (\d+)\) max_states_per_insn (\d+) total_states (\d+) peak_states (\d+) mark_read (\d+)`)
+var loadSuccessRegex = regexp.MustCompile(
+	`processed (\d+) insns \(limit (\d+)\) max_states_per_insn (\d+) total_states (\d+) peak_states ` +
+		`(\d+) mark_read (\d+)`,
+)
 
-func parseLoadSuccess(line string) *VerifierDone {
+func parseLoadSuccess(line string) VerifierStatement {
 	match := loadSuccessRegex.FindStringSubmatch(line)
-	instProcessed, _ := strconv.Atoi(match[1])
-	instLimit, _ := strconv.Atoi(match[2])
-	maxStatesPerInst, _ := strconv.Atoi(match[3])
-	totalStates, _ := strconv.Atoi(match[4])
-	peekStates, _ := strconv.Atoi(match[5])
-	markRead, _ := strconv.Atoi(match[6])
+	instProcessed, err := strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("inst processed atoi: %s", err)}
+	}
+
+	instLimit, err := strconv.Atoi(match[2])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("inst limit atoi: %s", err)}
+	}
+
+	maxStatesPerInst, err := strconv.Atoi(match[3])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("max states atoi: %s", err)}
+	}
+
+	totalStates, err := strconv.Atoi(match[4])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("total states atoi: %s", err)}
+	}
+
+	peekStates, err := strconv.Atoi(match[5])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("peek states atoi: %s", err)}
+	}
+
+	markRead, err := strconv.Atoi(match[6])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("mark read atoi: %s", err)}
+	}
 
 	return &VerifierDone{
 		InstructionsProcessed: instProcessed,
@@ -1290,30 +1434,36 @@ func (ls *VerifierDone) String() string {
 
 func (ls *VerifierDone) verifierStmt() {}
 
-func parseFunctionCall(firstLine string, scan *bufio.Scanner) *FunctionCall {
+func parseFunctionCall(firstLine string, scan *bufio.Scanner) VerifierStatement {
 	if strings.TrimSpace(firstLine) != "caller:" {
-		return nil
+		return &Error{Msg: "func call: bad initial line"}
 	}
 
 	if !scan.Scan() {
-		return nil
+		return &Error{Msg: "func call: no caller state"}
 	}
 
-	callerState := parseVerifierState(scan.Text())
+	callerState, err := parseVerifierState(scan.Text())
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("parse caller verifier state: %s", err)}
+	}
 
 	if !scan.Scan() {
-		return nil
+		return &Error{Msg: "func call: no callee state header"}
 	}
 
 	if strings.TrimSpace(scan.Text()) != "callee:" {
-		return nil
+		return &Error{Msg: "func call: bad callee state header"}
 	}
 
 	if !scan.Scan() {
-		return nil
+		return &Error{Msg: "func call: no callee state"}
 	}
 
-	calleeState := parseVerifierState(scan.Text())
+	calleeState, err := parseVerifierState(scan.Text())
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("parse callee verifier state: %s", err)}
+	}
 
 	return &FunctionCall{
 		CallerState: callerState,
@@ -1324,7 +1474,8 @@ func parseFunctionCall(firstLine string, scan *bufio.Scanner) *FunctionCall {
 // FunctionCall indicates the verifier is following a bpf-to-bpf function call.
 // For example:
 // caller:
-//   frame1: R6=pkt(id=0,off=54,r=74,imm=0) R7=pkt(id=0,off=0,r=74,imm=0) R8_w=pkt(id=0,off=74,r=74,imm=0) R9=invP6 R10=fp0 fp-8=pkt_end fp-16=mmmmmmmm
+//   frame1: R6=pkt(id=0,off=54,r=74,imm=0) R7=pkt(id=0,off=0,r=74,imm=0) R8_w=pkt(id=0,off=74,r=74,imm=0) R9=invP6
+//   R10=fp0 fp-8=pkt_end fp-16=mmmmmmmm
 //  callee:
 //   frame2: R1_w=pkt(id=0,off=54,r=74,imm=0) R2_w=invP(id=0) R10=fp0
 type FunctionCall struct {
@@ -1340,29 +1491,38 @@ func (fc *FunctionCall) verifierStmt() {}
 
 var returnFuncCallRegex = regexp.MustCompile(`^to caller at (\d+):`)
 
-func parseReturnFunctionCall(firstLine string, scan *bufio.Scanner) *ReturnFunctionCall {
+func parseReturnFunctionCall(firstLine string, scan *bufio.Scanner) VerifierStatement {
 	if strings.TrimSpace(firstLine) != "returning from callee:" {
-		return nil
+		return &Error{Msg: "return func call: bad initial line"}
 	}
 
 	if !scan.Scan() {
-		return nil
+		return &Error{Msg: "return func call: no callee state"}
 	}
 
-	calleeState := parseVerifierState(scan.Text())
+	calleeState, err := parseVerifierState(scan.Text())
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("parse callee verifier state: %s", err)}
+	}
 
 	if !scan.Scan() {
-		return nil
+		return &Error{Msg: "return func call: no call site line"}
 	}
 
 	match := returnFuncCallRegex.FindStringSubmatch(scan.Text())
-	callsite, _ := strconv.Atoi(match[1])
-
-	if !scan.Scan() {
-		return nil
+	callsite, err := strconv.Atoi(match[1])
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("callsite atoi: %s", err)}
 	}
 
-	callerState := parseVerifierState(scan.Text())
+	if !scan.Scan() {
+		return &Error{Msg: "return func call: no caller state"}
+	}
+
+	callerState, err := parseVerifierState(scan.Text())
+	if err != nil {
+		return &Error{Msg: fmt.Sprintf("parse caller verifier state: %s", err)}
+	}
 
 	return &ReturnFunctionCall{
 		CalleeState: calleeState,
@@ -1376,7 +1536,8 @@ func parseReturnFunctionCall(firstLine string, scan *bufio.Scanner) *ReturnFunct
 // returning from callee:
 //  frame2: R0=map_value(id=0,off=0,ks=1,vs=16,imm=0) R1_w=invP(id=0) R6=invP(id=31) R10=fp0 fp-8=m???????
 // to caller at 156:
-//   frame1: R0=map_value(id=0,off=0,ks=1,vs=16,imm=0) R6=pkt(id=0,off=54,r=54,imm=0) R7=pkt(id=0,off=0,r=54,imm=0) R8=invP14 R9=invP(id=30,umax_value=255,var_off=(0x0; 0xff)) R10=fp0 fp-8=pkt_end fp-16=mmmmmmmm
+//   frame1: R0=map_value(id=0,off=0,ks=1,vs=16,imm=0) R6=pkt(id=0,off=54,r=54,imm=0) R7=pkt(id=0,off=0,r=54,imm=0)
+//   R8=invP14 R9=invP(id=30,umax_value=255,var_off=(0x0; 0xff)) R10=fp0 fp-8=pkt_end fp-16=mmmmmmmm
 type ReturnFunctionCall struct {
 	CallerState *VerifierState
 	CallSite    int

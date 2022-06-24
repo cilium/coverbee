@@ -158,11 +158,15 @@ func InstrumentAndLoadCollection(
 			if subProgFuncs[blockSym] || name == blockSym {
 				// 1. Get registers used by function
 				var progFunc *btf.Func
-				if err := coll.Programs[name].BTF.TypeByName(blockSym, &progFunc); err != nil {
+				if err = coll.Programs[name].BTF.TypeByName(blockSym, &progFunc); err != nil {
 					return nil, nil, fmt.Errorf("can't find Func for '%s' in '%s': %w", blockSym, name, err)
 				}
 
-				funcProto := progFunc.Type.(*btf.FuncProto)
+				funcProto, ok := progFunc.Type.(*btf.FuncProto)
+				if !ok {
+					return nil, nil, fmt.Errorf("Func type for '%s' in '%s' is not a FuncProto", blockSym, name)
+				}
+
 				regCnt := len(funcProto.Params)
 
 				// 2.1. Initialize all un-initialized registers

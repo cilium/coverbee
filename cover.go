@@ -17,17 +17,16 @@ import (
 	"golang.org/x/tools/cover"
 )
 
-// HtmlOutput generates an HTML page from profile data.
+// HTMLOutput generates an HTML page from profile data.
 // coverage report is written to the out writer.
-func HtmlOutput(profiles []*cover.Profile, out io.Writer) error {
+func HTMLOutput(profiles []*cover.Profile, out io.Writer) error {
 	var d templateData
-
-	var err error
 
 	for _, profile := range profiles {
 		if profile.Mode == "set" {
 			d.Set = true
 		}
+
 		src, err := os.ReadFile(profile.FileName)
 		if err != nil {
 			return fmt.Errorf("can't read %q: %v", profile.FileName, err)
@@ -39,13 +38,14 @@ func HtmlOutput(profiles []*cover.Profile, out io.Writer) error {
 			return err
 		}
 		d.Files = append(d.Files, &templateFile{
-			Name:     profile.FileName,
+			Name: profile.FileName,
+			//#nosec G203 HTML escaping doesn't seem like an issue here
 			Body:     template.HTML(buf.String()),
 			Coverage: percentCovered(profile),
 		})
 	}
 
-	err = htmlTemplate.Execute(out, d)
+	err := htmlTemplate.Execute(out, d)
 	if err != nil {
 		return err
 	}
@@ -84,21 +84,24 @@ func htmlGen(w io.Writer, src []byte, boundaries []cover.Boundary) error {
 				}
 				fmt.Fprintf(dst, `<span class="cov%v" title="%v">`, n, b.Count)
 			} else {
-				dst.WriteString("</span>")
+				//nolint:errcheck // no remediation available if writes were to fail
+				_, _ = dst.WriteString("</span>")
 			}
 			boundaries = boundaries[1:]
 		}
+
+		//nolint:errcheck // no remediation available if writes were to fail
 		switch b := src[i]; b {
 		case '>':
-			dst.WriteString("&gt;")
+			_, _ = dst.WriteString("&gt;")
 		case '<':
-			dst.WriteString("&lt;")
+			_, _ = dst.WriteString("&lt;")
 		case '&':
-			dst.WriteString("&amp;")
+			_, _ = dst.WriteString("&amp;")
 		case '\t':
-			dst.WriteString("        ")
+			_, _ = dst.WriteString("        ")
 		default:
-			dst.WriteByte(b)
+			_ = dst.WriteByte(b)
 		}
 	}
 	return dst.Flush()
@@ -308,7 +311,7 @@ func BlockListToHTML(blockList [][]CoverBlock, out io.Writer, mode string) error
 		return err
 	}
 
-	if err = HtmlOutput(profiles, out); err != nil {
+	if err = HTMLOutput(profiles, out); err != nil {
 		return fmt.Errorf("write html: %w", err)
 	}
 
