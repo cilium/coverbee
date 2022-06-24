@@ -40,7 +40,7 @@ func InstrumentAndLoadCollection(
 	coll *ebpf.CollectionSpec,
 	opts ebpf.CollectionOptions,
 	logWriter io.Writer,
-) (*ebpf.Collection, []*ProgBlock, error) {
+) (*ebpf.Collection, []*BasicBlock, error) {
 	if logWriter != nil {
 		fmt.Fprintln(logWriter, "=== Original program ===")
 		for name, prog := range coll.Programs {
@@ -91,7 +91,7 @@ func InstrumentAndLoadCollection(
 		}
 	}
 
-	blockList := make([]*ProgBlock, 0)
+	blockList := make([]*BasicBlock, 0)
 
 	blockID := 0
 	if logWriter != nil {
@@ -393,7 +393,7 @@ func InstrumentAndLoadCollection(
 //  3. Loop over all instructions, creating a block at each branching instruction or symbol/jump label.
 //  4. Build a translation map from symbol/jump label to block.
 //  5. Loop over all blocks, using the map from step 4 to link blocks together on the branching and non-branching edges.
-func ProgramBlocks(prog asm.Instructions) []*ProgBlock {
+func ProgramBlocks(prog asm.Instructions) []*BasicBlock {
 	prog = slices.Clone(prog)
 
 	// Make a RawInstOffset -> instruction lookup which improves performance during jump labeling
@@ -424,12 +424,12 @@ func ProgramBlocks(prog asm.Instructions) []*ProgBlock {
 		*inst = inst.WithReference(label)
 	}
 
-	blocks := make([]*ProgBlock, 0)
-	curBlock := &ProgBlock{}
+	blocks := make([]*BasicBlock, 0)
+	curBlock := &BasicBlock{}
 	for _, inst := range prog {
 		if inst.Symbol() != "" {
 			if len(curBlock.Block) > 0 {
-				newBlock := &ProgBlock{
+				newBlock := &BasicBlock{
 					Index: curBlock.Index + 1,
 				}
 				curBlock.NoBranch = newBlock
@@ -446,7 +446,7 @@ func ProgramBlocks(prog asm.Instructions) []*ProgBlock {
 			continue
 		}
 
-		newBlock := &ProgBlock{
+		newBlock := &BasicBlock{
 			Index: curBlock.Index + 1,
 		}
 
@@ -459,7 +459,7 @@ func ProgramBlocks(prog asm.Instructions) []*ProgBlock {
 		curBlock = newBlock
 	}
 
-	symToBlock := make(map[string]*ProgBlock)
+	symToBlock := make(map[string]*BasicBlock)
 	for _, block := range blocks {
 		sym := block.Block[0].Symbol()
 		if sym != "" {
@@ -483,21 +483,22 @@ func ProgramBlocks(prog asm.Instructions) []*ProgBlock {
 	return blocks
 }
 
-type ProgBlock struct {
+// BasicBlock is a block of non-branching code, which makes up a node within the CFG.
+type BasicBlock struct {
 	Index int
 	// The current block of code
 	Block asm.Instructions
 
 	// The next block of we don't branch
-	NoBranch *ProgBlock
+	NoBranch *BasicBlock
 	// The next block if we do branch
-	Branch *ProgBlock
+	Branch *BasicBlock
 }
 
 // CFGToBlockList convert a CFG to a "BlockList", the outer slice indexed by BlockID which maps to an inner slice, each
 // element of which is a reference to a specific block of code inside a source file. Thus the resulting block list
 // can be used to translate blockID's into the pieces of source code to apply coverage mapping.
-func CFGToBlockList(cfg []*ProgBlock) [][]CoverBlock {
+func CFGToBlockList(cfg []*BasicBlock) [][]CoverBlock {
 	blockList := make([][]CoverBlock, 0, len(cfg))
 	for blockID, block := range cfg {
 		blockList = append(blockList, make([]CoverBlock, 0))
