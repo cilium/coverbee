@@ -261,6 +261,9 @@ func parseRecapState(line string) VerifierStatement {
 
 	instNr, _ := strconv.Atoi(match[1])
 	verifierState := parseVerifierState(match[2])
+	if verifierState == nil {
+		return &Error{Msg: "recap state: nil verifier state"}
+	}
 
 	return &RecapState{
 		InstructionNumber: instNr,
@@ -297,6 +300,9 @@ func parseInstructionState(line string) VerifierStatement {
 	}
 
 	verifierState := parseVerifierState(match[4])
+	if verifierState == nil {
+		return &Error{Msg: "bad or missing verifier state"}
+	}
 
 	return &InstructionState{
 		Instruction: Instruction{
@@ -363,6 +369,9 @@ func parseVerifierState(line string) *VerifierState {
 	if strings.HasPrefix(line, "frame") {
 		line = strings.TrimPrefix(line, "frame")
 		colon := strings.Index(line, ":")
+		if colon == -1 {
+			return nil
+		}
 		state.FrameNumber, _ = strconv.Atoi(line[:colon])
 		line = strings.TrimSpace(line[colon+1:])
 	}
@@ -377,6 +386,10 @@ func parseVerifierState(line string) *VerifierState {
 		var value string
 
 		line = line[equal+1:]
+		if len(line) == 0 {
+			break
+		}
+
 		bktDepth := 0
 		i := 0
 		for {
@@ -743,8 +756,22 @@ func parseRegisterValue(line string) *RegisterValue {
 		case "u32_max":
 			val.U32MaxValue = uint32(uintVal)
 		case "var_off":
-			hexVal := valStr[1:strings.Index(valStr, ";")]
-			hexMask := valStr[strings.Index(valStr, ";")+1 : strings.Index(valStr, ")")]
+			semicolon := strings.Index(valStr, ";")
+			closeBrace := strings.Index(valStr, ")")
+			// Semicolon must exist and not be at the first char.
+			if semicolon < 1 {
+				// Break to avoid bad slice access
+				break
+			}
+
+			// close brace must come after the semicolon
+			if closeBrace < semicolon {
+				// Break to avoid bad slice access
+				break
+			}
+
+			hexVal := valStr[1:semicolon]
+			hexMask := valStr[semicolon+1 : closeBrace]
 			val.VarOff.Value, _ = strconv.ParseInt(hexVal, 16, 64)
 			val.VarOff.Value, _ = strconv.ParseInt(hexMask, 16, 64)
 		}
