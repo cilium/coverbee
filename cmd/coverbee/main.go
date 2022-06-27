@@ -11,8 +11,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cilium/coverbee"
 	"github.com/cilium/ebpf"
-	"github.com/dylandreimerink/coverbee"
 	"github.com/spf13/cobra"
 )
 

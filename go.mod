@@ -1,4 +1,4 @@
-module github.com/dylandreimerink/coverbee
+module github.com/cilium/coverbee
 
 go 1.18
 

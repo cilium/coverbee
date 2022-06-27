@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/cilium/coverbee/pkg/verifierlog"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/dylandreimerink/coverbee/pkg/verifierlog"
 	"golang.org/x/exp/slices"
 	"golang.org/x/tools/cover"
 )
