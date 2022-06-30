@@ -175,7 +175,7 @@ func load(cmd *cobra.Command, args []string) error {
 
 	opts := ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
-			LogSize: 4 << 20,
+			LogSize: 32 << 20,
 		},
 	}
 

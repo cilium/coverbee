@@ -475,19 +475,19 @@ type VerifierState struct {
 func parseRegisterState(key, value string) (*RegisterState, error) {
 	var state RegisterState
 
-	if strings.HasSuffix(key, "_r") {
-		key = strings.TrimSuffix(key, "_r")
-		state.Liveness = LivenessRead
-	}
+	if idx := strings.Index(key, "_"); idx != -1 {
+		livenessStr := key[idx+1:]
+		if strings.Contains(livenessStr, "r") {
+			state.Liveness = state.Liveness | LivenessRead
+		}
+		if strings.Contains(livenessStr, "w") {
+			state.Liveness = state.Liveness | LivenessWritten
+		}
+		if strings.Contains(livenessStr, "D") {
+			state.Liveness = state.Liveness | LivenessDone
+		}
 
-	if strings.HasSuffix(key, "_w") {
-		key = strings.TrimSuffix(key, "_w")
-		state.Liveness = LivenessWritten
-	}
-
-	if strings.HasSuffix(key, "_D") {
-		key = strings.TrimSuffix(key, "_D")
-		state.Liveness = LivenessDone
+		key = key[:idx]
 	}
 
 	key = strings.Trim(key, "R")
@@ -537,8 +537,8 @@ func (is *VerifierState) String() string {
 type Liveness int
 
 const (
-	LivenessNone Liveness = iota
-	LivenessRead
+	LivenessNone Liveness = 0
+	LivenessRead          = 1 << (iota - 1)
 	LivenessWritten
 	LivenessDone
 )
@@ -658,8 +658,8 @@ func (rt RegType) String() string {
 // https://elixir.bootlin.com/linux/v5.18.3/source/include/linux/tnum.h
 // https://elixir.bootlin.com/linux/v5.18.3/source/kernel/bpf/tnum.c
 type TNum struct {
-	Value int64
-	Mask  int64
+	Value uint64
+	Mask  uint64
 }
 
 func (t TNum) isConst() bool {
@@ -744,7 +744,7 @@ func parseRegisterValue(line string) (*RegisterValue, error) {
 	if val.Type == RegTypeScalarValue {
 		varOff, err := strconv.Atoi(line)
 		if err == nil {
-			val.VarOff.Value = int64(varOff)
+			val.VarOff.Value = uint64(varOff)
 			return &val, nil
 		}
 	}
@@ -778,22 +778,22 @@ func parseRegisterValue(line string) (*RegisterValue, error) {
 		case "vs":
 			val.ValueSize = int(intVal)
 		case "imm":
-			val.VarOff.Value = intVal
-		case "smin":
+			val.VarOff.Value = uint64(intVal)
+		case "smin", "smin_value":
 			val.SMinValue = intVal
-		case "smax":
+		case "smax", "smax_value":
 			val.SMaxValue = intVal
-		case "umin":
+		case "umin", "umin_value":
 			val.UMinValue = uintVal
-		case "umax":
+		case "umax", "umax_value":
 			val.UMaxValue = uintVal
-		case "s32_min":
+		case "s32_min", "s32_min_value":
 			val.S32MinValue = int32(intVal)
-		case "s32_max":
+		case "s32_max", "s32_max_value":
 			val.S32MaxValue = int32(intVal)
-		case "u32_min":
+		case "u32_min", "u32_min_value":
 			val.U32MinValue = uint32(uintVal)
-		case "u32_max":
+		case "u32_max", "u32_max_value":
 			val.U32MaxValue = uint32(uintVal)
 		case "var_off":
 			semicolon := strings.Index(valStr, ";")
@@ -807,16 +807,16 @@ func parseRegisterValue(line string) (*RegisterValue, error) {
 				return nil, fmt.Errorf("bad var_off, closing brace must come after semicolon")
 			}
 
-			hexVal := valStr[1:semicolon]
-			hexMask := valStr[semicolon+1 : closeBrace]
+			hexVal := strings.TrimSpace(valStr[1:semicolon])
+			hexMask := strings.TrimSpace(valStr[semicolon+1 : closeBrace])
 
 			var err error
-			val.VarOff.Value, err = strconv.ParseInt(hexVal, 16, 64)
+			val.VarOff.Value, err = strconv.ParseUint(hexVal, 0, 64)
 			if err != nil {
 				return nil, fmt.Errorf("parse hex val: %w", err)
 			}
 
-			val.VarOff.Value, err = strconv.ParseInt(hexMask, 16, 64)
+			val.VarOff.Value, err = strconv.ParseUint(hexMask, 0, 64)
 			if err != nil {
 				return nil, fmt.Errorf("parse hex mask: %w", err)
 			}
@@ -873,7 +873,7 @@ func (rv RegisterValue) String() string {
 
 	if (rv.Type == RegTypeScalarValue || rv.Type == RegTypePtrToStack) && rv.VarOff.isConst() {
 		if rv.Type == RegTypeScalarValue {
-			fmt.Fprintf(&sb, "%d", rv.VarOff.Value+int64(rv.Off))
+			fmt.Fprintf(&sb, "%d", rv.VarOff.Value+uint64(rv.Off))
 		} else {
 			sb.WriteString(rv.Type.String())
 		}
@@ -965,13 +965,17 @@ func (r RegisterState) String() string {
 	var sb strings.Builder
 
 	fmt.Fprintf(&sb, "R%d", r.Register)
-	switch r.Liveness {
-	case LivenessRead:
-		fmt.Fprint(&sb, "_r")
-	case LivenessWritten:
-		fmt.Fprint(&sb, "_w")
-	case LivenessDone:
-		fmt.Fprint(&sb, "_D")
+	if r.Liveness != LivenessNone {
+		fmt.Fprint(&sb, "_")
+		if r.Liveness&^LivenessRead > 0 {
+			fmt.Fprint(&sb, "r")
+		}
+		if r.Liveness&^LivenessWritten > 0 {
+			fmt.Fprint(&sb, "w")
+		}
+		if r.Liveness&^LivenessDone > 0 {
+			fmt.Fprint(&sb, "D")
+		}
 	}
 
 	fmt.Fprintf(&sb, "=%s", r.Value.String())
@@ -982,19 +986,19 @@ func (r RegisterState) String() string {
 func parseStackState(key, value string) (*StackState, error) {
 	var state StackState
 
-	if strings.HasSuffix(key, "_r") {
-		key = strings.TrimSuffix(key, "_r")
-		state.Liveness = LivenessRead
-	}
+	if idx := strings.Index(key, "_"); idx != -1 {
+		livenessStr := key[idx+1:]
+		if strings.Contains(livenessStr, "r") {
+			state.Liveness = state.Liveness | LivenessRead
+		}
+		if strings.Contains(livenessStr, "w") {
+			state.Liveness = state.Liveness | LivenessWritten
+		}
+		if strings.Contains(livenessStr, "D") {
+			state.Liveness = state.Liveness | LivenessDone
+		}
 
-	if strings.HasSuffix(key, "_w") {
-		key = strings.TrimSuffix(key, "_w")
-		state.Liveness = LivenessWritten
-	}
-
-	if strings.HasSuffix(key, "_D") {
-		key = strings.TrimSuffix(key, "_D")
-		state.Liveness = LivenessDone
+		key = key[:idx]
 	}
 
 	key = strings.Trim(key, "fp-")
@@ -1030,7 +1034,7 @@ type StackSlot byte
 const (
 	StackSlotInvalid = '?'
 	StackSlotSpill   = 'r'
-	StackSlotMist    = 'm'
+	StackSlotMisc    = 'm'
 	StackSlotZero    = '0'
 )
 
@@ -1051,13 +1055,17 @@ func (ss *StackState) String() string {
 
 	fmt.Fprintf(&sb, "fp-%d", ss.Offset)
 
-	switch ss.Liveness {
-	case LivenessRead:
-		fmt.Fprint(&sb, "_r")
-	case LivenessWritten:
-		fmt.Fprint(&sb, "_w")
-	case LivenessDone:
-		fmt.Fprint(&sb, "_D")
+	if ss.Liveness != LivenessNone {
+		fmt.Fprint(&sb, "_")
+		if ss.Liveness&^LivenessRead > 0 {
+			fmt.Fprint(&sb, "r")
+		}
+		if ss.Liveness&^LivenessWritten > 0 {
+			fmt.Fprint(&sb, "w")
+		}
+		if ss.Liveness&^LivenessDone > 0 {
+			fmt.Fprint(&sb, "D")
+		}
 	}
 
 	fmt.Fprint(&sb, "=")
@@ -1278,7 +1286,11 @@ var backTrackInstructionRegex = regexp.MustCompile(`^regs=([0-9a-fA-F]+) stack=(
 
 func parseBackTrackInstruction(line string) VerifierStatement {
 	match := backTrackInstructionRegex.FindStringSubmatch(line)
-	regs, err := hex.DecodeString(match[1])
+	regsStr := match[1]
+	if len(regsStr)%2 == 1 {
+		regsStr = "0" + regsStr
+	}
+	regs, err := hex.DecodeString(regsStr)
 	if err != nil {
 		return &Error{Msg: fmt.Sprint("hex decode regs: ", err)}
 	}
@@ -1318,7 +1330,11 @@ var backTrackingTrailerRegex = regexp.MustCompile(
 
 func parseBacktrackingTrailer(line string) VerifierStatement {
 	match := backTrackingTrailerRegex.FindStringSubmatch(line)
-	regs, err := hex.DecodeString(match[2])
+	regsStr := match[2]
+	if len(regsStr)%2 == 1 {
+		regsStr = "0" + regsStr
+	}
+	regs, err := hex.DecodeString(regsStr)
 	if err != nil {
 		return &Error{Msg: fmt.Sprint("hex decode regs: ", err)}
 	}

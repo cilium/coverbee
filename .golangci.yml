@@ -1,3 +1,6 @@
+run:
+  tests: false
+
 linters-settings:
   errcheck:
     # report about not checking of errors in type assertions: `a := b.(MyStruct)`;
