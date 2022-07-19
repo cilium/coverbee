@@ -44,6 +44,9 @@ var (
 	flagProgPinDir string
 	flagProgType   string
 	flagLogPath    string
+
+	flagDisableInterpolation bool
+	flagForceInterpolation   bool
 )
 
 func panicOnError(err error) {
@@ -270,6 +273,9 @@ func coverageCmd() *cobra.Command {
 	fs.StringVar(&flagOutputPath, "output", "", "Path to the coverage output")
 	panicOnError(coverCmd.MarkFlagRequired("output"))
 
+	fs.BoolVar(&flagDisableInterpolation, "disable-interpolation", false, "Disable source based interpolation")
+	fs.BoolVar(&flagForceInterpolation, "force-interpolation", false, "Force source based interpolation, or error")
+
 	return coverCmd
 }
 
@@ -309,6 +315,19 @@ func coverage(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("apply covermap: %w", err)
 	}
 
+	outBlocks := blockList
+	if !flagDisableInterpolation {
+		outBlocks, err = coverbee.SourceCodeInterpolation(blockList, nil)
+		if err != nil {
+			if flagForceInterpolation {
+				return fmt.Errorf("error while interpolating using source files: %w", err)
+			}
+
+			fmt.Printf("Warning error while interpolating using source files, falling back: %s", err.Error())
+			outBlocks = blockList
+		}
+	}
+
 	var output io.Writer
 	if flagOutputPath == "-" {
 		output = os.Stdout
@@ -324,11 +343,11 @@ func coverage(cmd *cobra.Command, args []string) error {
 
 	switch flagOutputFormat {
 	case "html":
-		if err = coverbee.BlockListToHTML(blockList, output, "count"); err != nil {
+		if err = coverbee.BlockListToHTML(outBlocks, output, "count"); err != nil {
 			return fmt.Errorf("block list to HTML: %w", err)
 		}
 	case "go-cover", "cover":
-		coverbee.BlockListToGoCover(blockList, output, "count")
+		coverbee.BlockListToGoCover(outBlocks, output, "count")
 	default:
 		return fmt.Errorf("unknown output format")
 	}
