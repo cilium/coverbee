@@ -90,7 +90,7 @@ type FunctionDefinition struct {
 	BaseNode
 
 	// The keywords, return value, name and paramenters of the function.
-	DeclaratorAndSpec tokenList
+	DeclaratorAndSpec TokenList
 	// The function body
 	CompoundStatement *CompoundStatement
 }
@@ -204,7 +204,7 @@ type LabeledStatement struct {
 	// Name of the label, ("case" or "default" in switch cases)
 	Label string
 	// The value of a switch case, nil otherwise
-	ConstantExpression tokenList
+	ConstantExpression TokenList
 	// The statement after the label
 	Statement *Statement
 }
@@ -223,7 +223,7 @@ func (n *LabeledStatement) Children() []ASTNode {
 type ExpressionStatement struct {
 	BaseNode
 
-	Tokens tokenList
+	Tokens TokenList
 }
 
 // Children returns the child nodes
@@ -240,7 +240,7 @@ type SelectionStatement struct {
 	ClosingBracket lexer.Position
 	ElseToken      *lexer.Position
 
-	Expression tokenList
+	Expression TokenList
 	IfBody     *Statement
 	ElseBody   *Statement
 	SwitchBody *Statement
@@ -294,7 +294,7 @@ type WhileStatement struct {
 	// Closing bracket location, which is useful for coloring coverage reports.
 	ClosingBracket lexer.Position
 
-	GuardExpression tokenList
+	GuardExpression TokenList
 	Body            *Statement
 }
 
@@ -313,7 +313,7 @@ type DoWhileStatement struct {
 	BaseNode
 
 	Body            *Statement
-	GuardExpression tokenList
+	GuardExpression TokenList
 }
 
 // Children returns the child nodes
@@ -332,9 +332,9 @@ type ForStatement struct {
 
 	ClosingBracket lexer.Position
 
-	InitExpression      tokenList
-	GuardExpression     tokenList
-	IterationExpression tokenList
+	InitExpression      TokenList
+	GuardExpression     TokenList
+	IterationExpression TokenList
 	Body                *Statement
 }
 
@@ -357,7 +357,7 @@ type JumpStatement struct {
 	// The name of the goto label, empty if not goto
 	GotoIdent string
 	// The expression, the value of which is returned.
-	ReturnExpression tokenList
+	ReturnExpression TokenList
 }
 
 // Children returns the child nodes

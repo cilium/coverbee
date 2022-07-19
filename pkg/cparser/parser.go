@@ -52,14 +52,15 @@ func ParseFile(path string) (*TranslationUnit, error) {
 	return p.ParseTU(tl)
 }
 
-type tokenList []lexer.Token
+// TokenList is a list of tokens, the type contains a number of methods to make it easier to consume tokens.
+type TokenList []lexer.Token
 
-func newTokenList(list []lexer.Token) tokenList {
-	return tokenList(list)
+func newTokenList(list []lexer.Token) TokenList {
+	return TokenList(list)
 }
 
 // Next returns the next token in the list and advances the internal cursor
-func (tl *tokenList) Next() *lexer.Token {
+func (tl *TokenList) Next() *lexer.Token {
 	if len(*tl) == 0 {
 		return nil
 	}
@@ -70,12 +71,12 @@ func (tl *tokenList) Next() *lexer.Token {
 }
 
 // Peek the next token without advancing the internal cursor
-func (tl *tokenList) Peek() *lexer.Token {
+func (tl *TokenList) Peek() *lexer.Token {
 	return tl.PeekN(0)
 }
 
 // Peek a token `n` positions forward without advancing the internal cursor
-func (tl *tokenList) PeekN(n int) *lexer.Token {
+func (tl *TokenList) PeekN(n int) *lexer.Token {
 	if len(*tl) <= n {
 		return nil
 	}
@@ -84,12 +85,12 @@ func (tl *tokenList) PeekN(n int) *lexer.Token {
 }
 
 // Peek the last token contained in the list
-func (tl *tokenList) PeekTail() *lexer.Token {
+func (tl *TokenList) PeekTail() *lexer.Token {
 	return tl.PeekN(len(*tl) - 1)
 }
 
 // PeekSearch peeks ahead and searches all remaining tokens. If `fn` return true, we stop and return the matching index.
-func (tl *tokenList) PeekSearch(fn func(i int, t *lexer.Token) bool) int {
+func (tl *TokenList) PeekSearch(fn func(i int, t *lexer.Token) bool) int {
 	for i := range *tl {
 		if fn(i, &(*tl)[i]) {
 			return i
@@ -101,7 +102,7 @@ func (tl *tokenList) PeekSearch(fn func(i int, t *lexer.Token) bool) int {
 
 // PeekReverseSearch peeks backward and searches all remaining tokens.
 // If `fn` return true, we stop and return the matching index.
-func (tl *tokenList) PeekReverseSearch(fn func(i int, t *lexer.Token) bool) int {
+func (tl *TokenList) PeekReverseSearch(fn func(i int, t *lexer.Token) bool) int {
 	for i := len(*tl) - 1; i >= 0; i-- {
 		if fn(i, &((*tl)[i])) {
 			return i
@@ -112,12 +113,12 @@ func (tl *tokenList) PeekReverseSearch(fn func(i int, t *lexer.Token) bool) int 
 }
 
 // Sub returns a new token list starting from the internal cursor
-func (tl *tokenList) Sub() tokenList {
+func (tl *TokenList) Sub() TokenList {
 	return newTokenList(*tl)
 }
 
 // SubN returns a new token list starting from the internal cursor and ending at `n`
-func (tl *tokenList) SubN(n int) tokenList {
+func (tl *TokenList) SubN(n int) TokenList {
 	if len(*tl) == 0 {
 		return newTokenList(*tl)
 	}
@@ -130,7 +131,7 @@ func (tl *tokenList) SubN(n int) tokenList {
 	return newTokenList((*tl)[:n+1])
 }
 
-func (tl *tokenList) Advance(n int) {
+func (tl *TokenList) Advance(n int) {
 	if n >= len(*tl) {
 		*tl = nil
 		return
@@ -172,7 +173,7 @@ func (ute *UnexpectedTokenError) Error() string {
 }
 
 // NewParser creates a new parser for the given filename and contents.
-func NewParser(filename string, r io.Reader) (*Parser, tokenList, error) {
+func NewParser(filename string, r io.Reader) (*Parser, TokenList, error) {
 	lex, err := cLexer.Lex(filename, r)
 	if err != nil {
 		return nil, nil, fmt.Errorf("lex: %w", err)
@@ -184,7 +185,7 @@ func NewParser(filename string, r io.Reader) (*Parser, tokenList, error) {
 		syms["Whitespace"],
 	}
 
-	tokens := make(tokenList, 0)
+	tokens := make(TokenList, 0)
 tokenloop:
 	for {
 		token, err := lex.Next()
@@ -217,9 +218,9 @@ tokenloop:
 	}, tokens, nil
 }
 
-func (p *Parser) filterCode(tokens tokenList) tokenList {
+func (p *Parser) filterCode(tokens TokenList) TokenList {
 	var (
-		result tokenList
+		result TokenList
 		// Was the last token a new line?
 		lastNewLine = true
 
@@ -293,7 +294,7 @@ func (p *Parser) filterCode(tokens tokenList) tokenList {
 }
 
 // ParseTU attempts to parse all tokens within the parser as a translation unit
-func (p *Parser) ParseTU(tokens tokenList) (*TranslationUnit, error) {
+func (p *Parser) ParseTU(tokens TokenList) (*TranslationUnit, error) {
 	// 	(6.9) translation-unit:
 	// 				external-declaration
 	// 				translation-unit external-declaration
@@ -336,7 +337,7 @@ func (p *Parser) ParseTU(tokens tokenList) (*TranslationUnit, error) {
 			return false
 		})
 
-		var sub tokenList
+		var sub TokenList
 		if off == -1 {
 			sub = tokens.Sub()
 		} else {
@@ -364,7 +365,7 @@ func (p *Parser) ParseTU(tokens tokenList) (*TranslationUnit, error) {
 	return &tu, nil
 }
 
-func (p *Parser) parseExternalDeclaration(tokens tokenList) (*ExternalDeclaration, error) {
+func (p *Parser) parseExternalDeclaration(tokens TokenList) (*ExternalDeclaration, error) {
 	// (6.9) external-declaration:
 	// 			function-definition
 	// 			declaration
@@ -401,7 +402,7 @@ func (p *Parser) parseExternalDeclaration(tokens tokenList) (*ExternalDeclaratio
 	return &extDecl, nil
 }
 
-func (p *Parser) parseDeclaration(tokens tokenList) (*Declaration, error) {
+func (p *Parser) parseDeclaration(tokens TokenList) (*Declaration, error) {
 	// (6.7) declaration:
 	// 			declaration-specifiers init-declarator-list[opt] ;
 
@@ -413,7 +414,7 @@ func (p *Parser) parseDeclaration(tokens tokenList) (*Declaration, error) {
 	return &decl, nil
 }
 
-func (p *Parser) parseFunctionDefinition(tokens tokenList) (*FunctionDefinition, error) {
+func (p *Parser) parseFunctionDefinition(tokens TokenList) (*FunctionDefinition, error) {
 	// (6.9.1) function-definition:
 	// 			declaration-specifiers declarator declaration-list[opt] compound-statement
 
@@ -440,7 +441,7 @@ func (p *Parser) parseFunctionDefinition(tokens tokenList) (*FunctionDefinition,
 	return &funcDef, nil
 }
 
-func (p *Parser) parseCompoundStatement(tokens tokenList) (*CompoundStatement, error) {
+func (p *Parser) parseCompoundStatement(tokens TokenList) (*CompoundStatement, error) {
 	// (6.8.2) compound-statement:
 	// 			{ block-item-list[opt] }
 
@@ -488,7 +489,7 @@ func (p *Parser) parseCompoundStatement(tokens tokenList) (*CompoundStatement, e
 	return &compStmt, nil
 }
 
-func (p *Parser) parseBlockItem(tokens tokenList) (*BlockItem, tokenList, error) {
+func (p *Parser) parseBlockItem(tokens TokenList) (*BlockItem, TokenList, error) {
 	// (6.8.2) block-item:
 	// 		declaration
 	// 		statement
@@ -512,7 +513,7 @@ func (p *Parser) parseBlockItem(tokens tokenList) (*BlockItem, tokenList, error)
 	return &block, tokens, nil
 }
 
-func (p *Parser) parseStatement(tokens tokenList) (*Statement, tokenList, error) {
+func (p *Parser) parseStatement(tokens TokenList) (*Statement, TokenList, error) {
 	first := tokens.Peek()
 	next := tokens.PeekN(1)
 	if first == nil {
@@ -642,7 +643,7 @@ func (p *Parser) parseStatement(tokens tokenList) (*Statement, tokenList, error)
 	return &stmt, tokens, nil
 }
 
-func (p *Parser) parseLabeledStatement(tokens tokenList) (*LabeledStatement, tokenList, error) {
+func (p *Parser) parseLabeledStatement(tokens TokenList) (*LabeledStatement, TokenList, error) {
 	// (6.8.1) labeled-statement:
 	// 		identifier : statement
 	// 		case constant-expression : statement
@@ -696,7 +697,7 @@ func (p *Parser) parseLabeledStatement(tokens tokenList) (*LabeledStatement, tok
 	return &labelStmt, tail, nil
 }
 
-func (p *Parser) parseSelectionStatement(tokens tokenList) (*SelectionStatement, tokenList, error) {
+func (p *Parser) parseSelectionStatement(tokens TokenList) (*SelectionStatement, TokenList, error) {
 	// (6.8.4) selection-statement:
 	// 		if ( expression ) statement
 	// 		if ( expression ) statement else statement
@@ -771,7 +772,7 @@ func (p *Parser) parseSelectionStatement(tokens tokenList) (*SelectionStatement,
 	return &selStmt, tail, nil
 }
 
-func (p *Parser) parseIterationStatement(tokens tokenList) (*IterationStatement, tokenList, error) {
+func (p *Parser) parseIterationStatement(tokens TokenList) (*IterationStatement, TokenList, error) {
 	// (6.8.5) iteration-statement:
 	// 		while ( expression ) statement
 	// 		do statement while ( expression ) ;
@@ -820,7 +821,7 @@ func (p *Parser) parseIterationStatement(tokens tokenList) (*IterationStatement,
 	return nil, nil, newBadToken(*first, "'while', 'for', or 'do'")
 }
 
-func (p *Parser) parseWhileExpression(tokens tokenList) (*WhileStatement, tokenList, error) {
+func (p *Parser) parseWhileExpression(tokens TokenList) (*WhileStatement, TokenList, error) {
 	// while ( expression ) statement
 	first := tokens.Next()
 	second := tokens.Peek()
@@ -871,7 +872,7 @@ func (p *Parser) parseWhileExpression(tokens tokenList) (*WhileStatement, tokenL
 	return &whileExpr, tail, nil
 }
 
-func (p *Parser) parseForExpression(tokens tokenList) (*ForStatement, tokenList, error) {
+func (p *Parser) parseForExpression(tokens TokenList) (*ForStatement, TokenList, error) {
 	// 	for ( expressionopt ; expressionopt ; expressionopt ) statement
 	// 	for ( declaration expressionopt ; expressionopt ) statement
 
@@ -947,7 +948,7 @@ func (p *Parser) parseForExpression(tokens tokenList) (*ForStatement, tokenList,
 	return &forStmt, tail, nil
 }
 
-func (p *Parser) parseDoWhileExpression(tokens tokenList) (*DoWhileStatement, tokenList, error) {
+func (p *Parser) parseDoWhileExpression(tokens TokenList) (*DoWhileStatement, TokenList, error) {
 	// do statement while ( expression ) ;
 
 	first := tokens.Next()
@@ -1022,7 +1023,7 @@ func (p *Parser) parseDoWhileExpression(tokens tokenList) (*DoWhileStatement, to
 	return &doWhileStmt, tokens, nil
 }
 
-func (p *Parser) parseJumpStatement(tokens tokenList) (*JumpStatement, tokenList, error) {
+func (p *Parser) parseJumpStatement(tokens TokenList) (*JumpStatement, TokenList, error) {
 	// (6.8.6) jump-statement:
 	// 		goto identifier ;
 	// 		continue ;
