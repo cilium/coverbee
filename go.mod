@@ -3,6 +3,7 @@ module github.com/cilium/coverbee
 go 1.18
 
 require (
+	github.com/alecthomas/participle/v2 v2.0.0-beta.4
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
 	github.com/cilium/ebpf v0.9.0
 	github.com/davecgh/go-spew v1.1.1
