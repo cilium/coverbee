@@ -30,7 +30,7 @@ var cLexer = lexer.MustSimple([]lexer.SimpleRule{
 	{Name: tokenOctalNumber, Pattern: `0[0-7]+`},
 	{Name: tokenNumber, Pattern: `[-+]?(\d*\.)?\d+`},
 	{Name: tokenIdent, Pattern: `[a-zA-Z_]\w*`},
-	{Name: tokenPunct, Pattern: `[-[!@#$%^&*()+_={}\|:;"'<,>.?/~]|]`},
+	{Name: tokenPunct, Pattern: `[-[!@#$%^&*()+_={}\|:;"'<,>.?\\/~]|]`},
 	{Name: tokenEscapedEOL, Pattern: `\\[\n\r]+`},
 	{Name: tokenEOL, Pattern: `[\n\r]+`},
 	{Name: tokenWhitespace, Pattern: `[ \t]+`},
