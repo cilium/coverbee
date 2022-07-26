@@ -80,6 +80,9 @@ func (tl *TokenList) PeekN(n int) *lexer.Token {
 	if len(*tl) <= n {
 		return nil
 	}
+	if n < 0 {
+		return nil
+	}
 
 	return &(*tl)[n]
 }
@@ -372,6 +375,11 @@ func (p *Parser) parseExternalDeclaration(tokens TokenList) (*ExternalDeclaratio
 	last := tokens.PeekTail()
 	if last == nil {
 		return nil, fmt.Errorf("no last token")
+	}
+
+	// Discard trailing tokens.
+	if last.EOF() {
+		return nil, nil
 	}
 
 	var extDecl ExternalDeclaration
