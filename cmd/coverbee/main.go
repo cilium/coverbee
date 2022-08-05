@@ -116,30 +116,8 @@ func load(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Load collection spec: %w", err)
 	}
 
-	// Detect program type mismatches
-	var progTestType ebpf.ProgramType
-	for _, prog := range spec.Programs {
-		if progTestType != prog.Type {
-			if progTestType == ebpf.UnspecifiedProgram {
-				progTestType = prog.Type
-				continue
-			}
-			if prog.Type == ebpf.UnspecifiedProgram {
-				continue
-			}
-
-			return fmt.Errorf(
-				"File '%s' contains both '%s' and '%s' program types, "+
-					"only one program type per ELF file allowed:",
-				flagElfPath,
-				progTestType,
-				prog.Type,
-			)
-		}
-	}
-
 	if flagProgType != "" {
-		progTestType = strToProgType[flagProgType]
+		progTestType := strToProgType[flagProgType]
 		if progTestType == ebpf.UnspecifiedProgram {
 			options := make([]string, 0, len(strToProgType))
 			for option := range strToProgType {
@@ -155,13 +133,22 @@ func load(cmd *cobra.Command, args []string) error {
 
 			return errors.New(sb.String())
 		}
+
+		// Set all unknown program types to the specified type
+		for _, spec := range spec.Programs {
+			if spec.Type == ebpf.UnspecifiedProgram {
+				spec.Type = progTestType
+			}
+		}
 	}
 
-	if progTestType == ebpf.UnspecifiedProgram {
-		return fmt.Errorf(
-			"File '%s' only contains unspecified program types, use --prog-type to explicitly set one",
-			flagElfPath,
-		)
+	for _, spec := range spec.Programs {
+		if spec.Type == ebpf.UnspecifiedProgram {
+			return fmt.Errorf(
+				"Program '%s' is of an unspecified type, use --prog-type to explicitly set one",
+				spec.Name,
+			)
+		}
 	}
 
 	for _, m := range spec.Maps {
@@ -169,11 +156,6 @@ func load(cmd *cobra.Command, args []string) error {
 			//nolint:errcheck // we explicitly discard the error, no remediation available
 			_, _ = io.ReadAll(m.Extra)
 		}
-	}
-
-	// Give all tail call programs the same program type as the test programs
-	for _, spec := range spec.Programs {
-		spec.Type = progTestType
 	}
 
 	opts := ebpf.CollectionOptions{
