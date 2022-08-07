@@ -73,6 +73,9 @@ func InstrumentAndLoadCollection(
 
 			return nil, nil, fmt.Errorf("load program: %w", err)
 		}
+		if err == nil {
+			break
+		}
 	}
 
 	if logWriter != nil {
