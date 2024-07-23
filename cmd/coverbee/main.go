@@ -158,11 +158,7 @@ func load(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	opts := ebpf.CollectionOptions{
-		Programs: ebpf.ProgramOptions{
-			LogSize: 32 << 20,
-		},
-	}
+	opts := ebpf.CollectionOptions{}
 
 	if flagMapPinDir != "" {
 		opts.Maps.PinPath = flagMapPinDir
